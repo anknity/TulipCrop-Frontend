@@ -32,6 +32,10 @@
   box-sizing: border-box;
 }
 
+.logo-wordmark {
+  font-family: sans-serif;
+}
+
 html {
   scroll-behavior: smooth;
 }

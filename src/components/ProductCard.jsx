@@ -2,13 +2,17 @@ import { memo, useEffect, useState } from 'react'
 import { Heart, Package2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, useProductBackground = false }) => {
   const [hasError, setHasError] = useState(false)
   const imageSrc = typeof product.image === 'string' ? product.image.trim() : ''
   const [likedProducts, setLikedProducts] = useState(() => {
     const saved = sessionStorage.getItem('liked_products')
     return saved ? JSON.parse(saved) : {}
   })
+
+  const imageSectionStyle = useProductBackground
+    ? { backgroundImage: "url('/Product-card-bg.png')" }
+    : undefined
 
   useEffect(() => {
     setHasError(false)
@@ -23,9 +27,12 @@ const ProductCard = ({ product }) => {
   }
 
   return (
-    <Link to={`/products/${product._id}`} className="group flex flex-col h-full rounded-[30px] p-[10px] bg-white border border-slate-200/50 shadow-sm overflow-hidden dark:bg-[#14181d]/85 dark:border-white/10 dark:shadow-[0_12px_36px_rgba(0,0,0,0.25)] transition-all duration-300 hover:shadow-md">
+    <Link to={`/products/${product._id}`} className="group flex flex-col h-full rounded-2xl p-[10px] bg-white border border-slate-200/50 shadow-sm overflow-hidden dark:bg-[#14181d]/85 dark:border-white/10 dark:shadow-[0_12px_36px_rgba(0,0,0,0.25)] transition-all duration-300 hover:shadow-md">
       {/* Top Image Section */}
-      <div className="relative h-60 w-full rounded-[24px] overflow-hidden bg-black">
+      <div
+        className="relative h-60 w-full rounded-xl overflow-hidden bg-black bg-center bg-cover"
+        style={imageSectionStyle}
+      >
         <div
           className="absolute inset-0 z-0 pointer-events-none"
           style={{

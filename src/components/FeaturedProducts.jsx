@@ -136,9 +136,9 @@ const FeaturedProducts = () => {
               return (
                 <article
                   key={product._id}
-                  className="rounded-[32px] border border-[#c7d9c7] bg-[#edf4ed] p-2 shadow-[0_8px_18px_rgba(23,34,23,0.16)]"
+                  className="rounded-2xl border border-[#c7d9c7] bg-[#edf4ed] p-2 shadow-[0_8px_18px_rgba(23,34,23,0.16)]"
                 >
-                  <div className="rounded-[24px] border border-[#c7d9c7] bg-[#f8fcf8] p-4 h-full flex flex-col">
+                  <div className="rounded-xl border border-[#c7d9c7] bg-[#f8fcf8] p-4 h-full flex flex-col">
                     <div className="flex items-center justify-between mb-3">
                       <img src="/logo.png" alt="TulipCrop" className="w-10 h-10 object-contain" />
                       <div className="flex items-center gap-2.5">

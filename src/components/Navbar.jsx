@@ -32,8 +32,8 @@ const Navbar = ({ theme, toggleTheme }) => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
             <img src="/logo.png" alt="TulipCrop Logo" className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110" />
-            <span className="text-xl font-bold tracking-tighter text-white">
-              TulipCrop
+            <span className="text-xl font-bold tracking-tighter text-white logo-wordmark">
+              Tulipcrop
             </span>
           </Link>
 

@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, Play } from 'lucide-react'
 
+const HERO_STATS = [
+  { value: 100, label: 'Products' },
+  { value: 4, label: 'States' },
+  { value: 200, label: 'Distributors' },
+  { value: 6, label: 'Categories' },
+]
+
 const Hero = () => {
   const [shouldPlayVideo, setShouldPlayVideo] = useState(false)
   const [videoReady, setVideoReady] = useState(false)
+  const [counts, setCounts] = useState(() => HERO_STATS.map(() => 0))
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -11,6 +19,25 @@ const Hero = () => {
     }, 2000)
 
     return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    let start = null
+    const duration = 1200
+
+    const tick = (timestamp) => {
+      if (!start) start = timestamp
+      const progress = Math.min((timestamp - start) / duration, 1)
+      const nextCounts = HERO_STATS.map((stat) => Math.floor(stat.value * progress))
+      setCounts(nextCounts)
+
+      if (progress < 1) {
+        requestAnimationFrame(tick)
+      }
+    }
+
+    const rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
   }, [])
 
   return (
@@ -85,14 +112,12 @@ const Hero = () => {
           </div>
 
           {/* Stats */}
-          <div className="mt-20 grid grid-cols-3 gap-8 max-w-3xl mx-auto animate-fade-in-up delay-400">
-            {[
-              { value: '10K+', label: 'Farmers Served' },
-              { value: '50+', label: 'Product Varieties' },
-              { value: '98%', label: 'Satisfaction Rate' },
-            ].map((stat) => (
+          <div className="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-8 max-w-4xl mx-auto animate-fade-in-up delay-400">
+            {HERO_STATS.map((stat, index) => (
               <div key={stat.label} className="text-center">
-                <div className="text-3xl sm:text-4xl font-black text-[#587a14]">{stat.value}</div>
+                <div className="text-3xl sm:text-4xl font-black text-[#587a14]">
+                  {counts[index]}+
+                </div>
                 <div className="text-sm font-medium text-slate-300 mt-1">{stat.label}</div>
               </div>
             ))}

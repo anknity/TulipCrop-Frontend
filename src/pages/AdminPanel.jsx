@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Plus, Pencil, Trash2, LogOut, Package2, Upload, X, Save, Loader2, Image as ImageIcon,
+  Plus, Pencil, Trash2, LogOut, Package2, Upload, ChevronLeft, Save, Loader2, Image as ImageIcon, Activity
 } from 'lucide-react'
 import axios from 'axios'
 
@@ -27,9 +27,13 @@ const AdminPanel = () => {
   const [form, setForm] = useState({ ...emptyProduct })
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState('')
+  const [imageError, setImageError] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('All')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(null)
-  const [activeTab, setActiveTab] = useState('basic') // basic, specs, advanced
+  const [activeTab, setActiveTab] = useState('specs') // specs, advanced
 
   const token = localStorage.getItem('adminToken')
 
@@ -44,7 +48,7 @@ const AdminPanel = () => {
   const fetchProducts = async () => {
     try {
       const { data } = await axios.get(`${API}/api/products`)
-      setProducts(data)
+      setProducts(data.reverse()) // Show newest first
     } catch (err) {
       console.error('Failed to fetch products:', err)
     } finally {
@@ -63,7 +67,8 @@ const AdminPanel = () => {
     setForm({ ...emptyProduct })
     setImageFile(null)
     setImagePreview('')
-    setActiveTab('basic')
+    setImageError('')
+    setActiveTab('specs')
     setShowForm(true)
   }
 
@@ -92,35 +97,52 @@ const AdminPanel = () => {
     })
     setImageFile(null)
     setImagePreview(product.image || '')
-    setActiveTab('basic')
+    setImageError('')
+    setActiveTab('specs')
     setShowForm(true)
   }
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      setImageFile(file)
-      setImagePreview(URL.createObjectURL(file))
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+  const handleFileSelect = (file) => {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setImageError('Please upload a valid image file.')
+      return
     }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageError('Image must be 5MB or less.')
+      return
+    }
+    setImageError('')
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
   }
 
-  const handleCompChange = (index, field, value) => {
-    const newComp = [...form.composition]
-    newComp[index][field] = value
-    setForm({ ...form, composition: newComp })
+  const handleImageChange = (e) => {
+    handleFileSelect(e.target.files[0])
   }
-  const addComp = () => setForm({ ...form, composition: [...form.composition, { component: '', amount: '' }] })
-  const removeComp = (index) => setForm({ ...form, composition: form.composition.filter((_, i) => i !== index) })
 
-  const handleAppChange = (index, field, value) => {
-    const newApp = [...form.applicationMethod]
-    newApp[index][field] = value
-    setForm({ ...form, applicationMethod: newApp })
+  const handleDrop = (event) => {
+    event.preventDefault()
+    setIsDragging(false)
+    const file = event.dataTransfer.files?.[0]
+    handleFileSelect(file)
   }
-  const addApp = () => setForm({ ...form, applicationMethod: [...form.applicationMethod, { step: form.applicationMethod.length + 1, title: '', instruction: '' }] })
-  const removeApp = (index) => {
-    const newApp = form.applicationMethod.filter((_, i) => i !== index).map((a, i) => ({ ...a, step: i + 1 }))
-    setForm({ ...form, applicationMethod: newApp })
+
+  const handleDragOver = (event) => {
+    event.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = () => {
+    setIsDragging(false)
+  }
+
+  const clearImage = () => {
+    setImageFile(null)
+    setImagePreview('')
+    setImageError('')
   }
 
   const handleSubmit = async (e) => {
@@ -177,12 +199,330 @@ const AdminPanel = () => {
     }
   }
 
+  // Analytics Calculations
+  const distribution = useMemo(() => {
+    if (products.length === 0) return []
+    const counts = {}
+    products.forEach(p => {
+      counts[p.category] = (counts[p.category] || 0) + 1
+    })
+    
+    const colors = {
+      'Herbicide': 'bg-red-500',
+      'Fungicide': 'bg-blue-500',
+      'Insecticide': 'bg-yellow-500',
+      'PGR': 'bg-purple-500',
+      'Bio Products': 'bg-green-500',
+      'Fertilizers': 'bg-emerald-600',
+    }
+
+    const dist = Object.keys(counts).map(cat => ({
+      category: cat,
+      count: counts[cat],
+      percentage: Math.round((counts[cat] / products.length) * 100),
+      color: colors[cat] || 'bg-slate-500'
+    })).sort((a, b) => b.count - a.count)
+    return dist
+  }, [products])
+
+  const filteredProducts = useMemo(() => {
+    const normalized = searchQuery.trim().toLowerCase()
+    return products.filter((product) => {
+      const matchesCategory = categoryFilter === 'All' || product.category === categoryFilter
+      if (!normalized) return matchesCategory
+      const haystack = [product.name, product.activeIngredient, product.technicalName]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return matchesCategory && haystack.includes(normalized)
+    })
+  }, [products, searchQuery, categoryFilter])
+
+  const dashboardStats = useMemo(() => {
+    const total = products.length
+    const categories = new Set(products.map((product) => product.category)).size
+    const withImages = products.filter((product) => product.image).length
+    const withBadges = products.filter((product) => product.badge).length
+    return [
+      { label: 'Total Products', value: total },
+      { label: 'Active Categories', value: categories },
+      { label: 'Products With Images', value: withImages },
+      { label: 'Badged Products', value: withBadges },
+    ]
+  }, [products])
+
+  // Sub-components for Form
+  const handleCompChange = (index, field, value) => {
+    const newComp = [...form.composition]
+    newComp[index][field] = value
+    setForm({ ...form, composition: newComp })
+  }
+  const addComp = () => setForm({ ...form, composition: [...form.composition, { component: '', amount: '' }] })
+  const removeComp = (index) => setForm({ ...form, composition: form.composition.filter((_, i) => i !== index) })
+
+  const handleAppChange = (index, field, value) => {
+    const newApp = [...form.applicationMethod]
+    newApp[index][field] = value
+    setForm({ ...form, applicationMethod: newApp })
+  }
+  const addApp = () => setForm({ ...form, applicationMethod: [...form.applicationMethod, { step: form.applicationMethod.length + 1, title: '', instruction: '' }] })
+  const removeApp = (index) => {
+    const newApp = form.applicationMethod.filter((_, i) => i !== index).map((a, i) => ({ ...a, step: i + 1 }))
+    setForm({ ...form, applicationMethod: newApp })
+  }
+
+  if (showForm) {
+    return (
+      <main className="min-h-screen bg-slate-50 dark:bg-[#0d0f13] pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Form Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setShowForm(false)} className="p-2 rounded-xl bg-white dark:bg-[#14161a] border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                  {editId ? 'Edit Product' : 'Add New Product'}
+                </h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Update product details, inventory, and media.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14161a] text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-sm">
+                Cancel
+              </button>
+              <button onClick={handleSubmit} disabled={saving} className="px-5 py-2.5 rounded-xl bg-brand-lime text-brand-dark font-bold flex items-center gap-2 hover:bg-brand-volt disabled:opacity-60 transition-colors text-sm shadow-sm shadow-brand-lime/20">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+
+          {/* Form Body - 2 Columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-6">
+            
+            {/* Left Column */}
+            <div className="space-y-6">
+              {/* General Information Card */}
+              <div className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100 dark:border-white/5">
+                  <Package2 className="w-5 h-5 text-slate-400" />
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">General Information</h2>
+                </div>
+                
+                <div className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Product Name</label>
+                    <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="e.g. Hunter Bio-Stimulant" />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Hindi Name</label>
+                      <input value={form.hindiName} onChange={e => setForm({...form, hindiName: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Hindi name (optional)" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Technical Name</label>
+                      <input value={form.technicalName} onChange={e => setForm({...form, technicalName: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Technical name" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Chemical Formula / Active Ingredient</label>
+                    <input value={form.activeIngredient} onChange={e => setForm({...form, activeIngredient: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="e.g. Pendimethalin 30% EC" />
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">Specify the active ingredients and concentration.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Description</label>
+                    <textarea required rows="5" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Detailed product description..." />
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Specs Card (Tabs for Specs / Application) */}
+              <div className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 p-6 shadow-sm">
+                 <div className="flex items-center gap-6 mb-6 pb-4 border-b border-slate-100 dark:border-white/5">
+                    {['specs', 'advanced'].map(tab => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActiveTab(tab)}
+                        className={`text-sm font-bold capitalize transition-colors ${activeTab === tab ? 'text-brand-lime' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                      >
+                        {tab === 'specs' ? 'Specifications' : 'Composition & Application'}
+                      </button>
+                    ))}
+                 </div>
+
+                 {activeTab === 'specs' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Formulation</label>
+                      <input value={form.formulation} onChange={e => setForm({...form, formulation: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="e.g. WP, EC" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Dosage</label>
+                      <input value={form.dosage} onChange={e => setForm({...form, dosage: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Dosage" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Target Pests</label>
+                      <input value={form.targetPests} onChange={e => setForm({...form, targetPests: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Target Pests" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Crop Type</label>
+                      <input value={form.cropType} onChange={e => setForm({...form, cropType: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Crop Type" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Mode of Action</label>
+                      <input value={form.modeOfAction} onChange={e => setForm({...form, modeOfAction: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Mode of Action" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Solubility</label>
+                      <input value={form.solubility} onChange={e => setForm({...form, solubility: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Solubility" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Manufacturer</label>
+                      <input value={form.manufacturer} onChange={e => setForm({...form, manufacturer: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Manufacturer" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Toxicity Level</label>
+                      <input value={form.toxicityLevel} onChange={e => setForm({...form, toxicityLevel: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="Toxicity Level" />
+                    </div>
+                  </div>
+                 )}
+
+                 {activeTab === 'advanced' && (
+                  <div className="space-y-8">
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <label className="text-sm font-bold text-slate-900 dark:text-white">Chemical Composition</label>
+                        <button type="button" onClick={addComp} className="text-xs bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 dark:hover:bg-white/20 transition-colors">+ Add Component</button>
+                      </div>
+                      {form.composition.map((comp, i) => (
+                        <div key={i} className="flex gap-2 mb-2">
+                          <input value={comp.component} onChange={e => handleCompChange(i, 'component', e.target.value)} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0 py-2" placeholder="Component Name" />
+                          <input value={comp.amount} onChange={e => handleCompChange(i, 'amount', e.target.value)} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0 w-24 py-2" placeholder="Amount" />
+                          <button type="button" onClick={() => removeComp(i)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                      {form.composition.length === 0 && <p className="text-xs text-slate-500">No composition added.</p>}
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <label className="text-sm font-bold text-slate-900 dark:text-white">Application Steps</label>
+                        <button type="button" onClick={addApp} className="text-xs bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white px-3 py-1.5 rounded-lg font-bold hover:bg-slate-200 dark:hover:bg-white/20 transition-colors">+ Add Step</button>
+                      </div>
+                      {form.applicationMethod.map((app, i) => (
+                        <div key={i} className="flex gap-2 mb-3 items-start bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-100 dark:border-white/5">
+                          <span className="w-6 h-6 rounded-full bg-brand-lime text-black flex items-center justify-center text-xs font-bold shrink-0">{app.step}</span>
+                          <div className="flex-1 space-y-2">
+                            <input value={app.title} onChange={e => handleAppChange(i, 'title', e.target.value)} className="form-input py-1.5 text-sm bg-white dark:bg-[#14161a]" placeholder="Step Title" />
+                            <textarea value={app.instruction} onChange={e => handleAppChange(i, 'instruction', e.target.value)} className="form-input py-1.5 text-sm bg-white dark:bg-[#14161a]" rows="2" placeholder="Step Instructions" />
+                          </div>
+                          <button type="button" onClick={() => removeApp(i)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                      {form.applicationMethod.length === 0 && <p className="text-xs text-slate-500">No application steps added.</p>}
+                    </div>
+                  </div>
+                 )}
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              
+              {/* Image Upload Card */}
+              <div className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 p-5 shadow-sm">
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-3 uppercase tracking-wider">Product Image</label>
+                <div
+                  className={`relative rounded-xl border-2 border-dashed bg-slate-50 dark:bg-[#0d0f13] overflow-hidden group aspect-square flex items-center justify-center mb-3 transition-colors ${isDragging ? 'border-brand-lime' : 'border-slate-200 dark:border-white/10'} hover:border-brand-lime`}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-contain p-4 drop-shadow-xl" />
+                  ) : (
+                    <div className="text-center text-slate-400">
+                      <ImageIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                      <span className="text-sm font-medium">Drag & drop image here</span>
+                      <p className="text-xs text-slate-400 mt-1">or click to upload</p>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                     <label className="cursor-pointer bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-bold shadow-lg hover:bg-brand-lime transition-colors">
+                        Upload Image
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                     </label>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="cursor-pointer w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                    <Upload className="w-4 h-4" /> Change Image
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                  </label>
+                  {imagePreview && (
+                    <button type="button" onClick={clearImage} className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {imageError ? (
+                  <p className="text-[11px] text-center text-red-500 mt-2">{imageError}</p>
+                ) : (
+                  <p className="text-[11px] text-center text-slate-400 mt-2">Allowed: .jpg, .png, .webp (max 5MB)</p>
+                )}
+              </div>
+
+              {/* Organization Card */}
+              <div className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 p-5 shadow-sm">
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-4 uppercase tracking-wider">Organization</label>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Category</label>
+                    <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0">
+                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Pack Size</label>
+                      <input value={form.packSize} onChange={e => setForm({...form, packSize: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="e.g. 1L" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Shelf Life</label>
+                      <input value={form.shelfLife} onChange={e => setForm({...form, shelfLife: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="e.g. 2 Years" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Badge (Optional)</label>
+                    <input value={form.badge} onChange={e => setForm({...form, badge: e.target.value})} className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0" placeholder="e.g. BESTSELLER" />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   return (
-    <main className="min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-slate-50 dark:bg-[#0d0f13] pt-24 pb-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="TulipCrop Logo" className="w-11 h-11 object-contain" />
+            <img src="/logo.png" alt="TulipCrop Logo" className="w-10 h-10 object-contain drop-shadow-sm" />
             <div>
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Panel</h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -191,236 +531,195 @@ const AdminPanel = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={openAddForm} className="px-5 py-2.5 rounded-xl bg-brand-lime text-brand-dark font-semibold flex items-center gap-2 hover:bg-brand-volt transition-colors text-sm">
+            <button onClick={openAddForm} className="px-5 py-2.5 rounded-xl bg-brand-lime text-brand-dark font-bold flex items-center gap-2 hover:bg-brand-volt transition-colors text-sm shadow-sm shadow-brand-lime/20">
               <Plus className="w-4 h-4" /> Add Product
             </button>
-            <button onClick={handleLogout} className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-medium flex items-center gap-2 hover:border-red-300 hover:text-red-500 transition-colors text-sm">
+            <button onClick={handleLogout} className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14161a] text-slate-600 dark:text-slate-300 font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-sm shadow-sm">
               <LogOut className="w-4 h-4" /> Logout
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-          <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14161a] p-5">
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">{products.length}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">Total Products</p>
-          </div>
-          {['Herbicide', 'Fungicide', 'Insecticide'].map((cat) => (
-            <div key={cat} className="rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-[#14161a] p-5">
-              <p className="text-3xl font-bold text-slate-900 dark:text-white">
-                {products.filter((p) => p.category === cat).length}
+        {/* Dashboard Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {dashboardStats.map((stat) => (
+            <div key={stat.label} className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 p-4 shadow-sm">
+              <p className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+                {stat.label}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 uppercase tracking-wider">{cat}</p>
+              <p className="text-2xl font-black text-slate-900 dark:text-white mt-2">
+                {stat.value}
+              </p>
             </div>
           ))}
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-brand-lime animate-spin" />
-          </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-20 rounded-3xl border border-dashed border-slate-300 dark:border-white/10">
-            <Package2 className="w-16 h-16 text-slate-300 dark:text-slate-600 mx-auto mb-4" />
-            <p className="text-xl font-semibold text-slate-500 dark:text-slate-400 mb-2">No products yet</p>
-            <button onClick={openAddForm} className="px-6 py-3 rounded-xl bg-brand-lime text-brand-dark font-semibold hover:bg-brand-volt mt-4 transition-colors">
-              <Plus className="w-4 h-4 inline mr-2" />Add Product
-            </button>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
-            <div className="hidden md:grid md:grid-cols-[80px_1fr_150px_120px_100px_120px] gap-4 px-6 py-3 bg-slate-50 dark:bg-white/[0.03] text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-white/10">
-              <span>Image</span><span>Product</span><span>Category</span><span>Formulation</span><span>Pack</span><span className="text-right">Actions</span>
-            </div>
-            {products.map((product) => (
-              <div key={product._id} className="grid grid-cols-1 md:grid-cols-[80px_1fr_150px_120px_100px_120px] gap-4 px-6 py-4 items-center border-b border-slate-100 dark:border-white/5 bg-white dark:bg-transparent hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
-                <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0">
-                  {product.image ? (
-                    <img src={product.image} alt={product.name} className="w-full h-full object-contain p-1" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-slate-400"><ImageIcon className="w-6 h-6" /></div>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{product.name}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{product.activeIngredient}</p>
-                </div>
-                <p className="text-sm text-slate-600 dark:text-slate-300">{product.category}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{product.formulation || '—'}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{product.packSize || '—'}</p>
-                <div className="flex items-center justify-end gap-2">
-                  <button onClick={() => openEditForm(product)} className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-600 hover:text-blue-600 transition-colors">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => handleDelete(product._id)} disabled={deleting === product._id} className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-600 hover:text-red-600 transition-colors">
-                    {deleting === product._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  </button>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+          
+          {/* Main Content (Table) */}
+          <div className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col">
+            <div className="flex flex-col gap-4 p-5 border-b border-slate-100 dark:border-white/5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Product Catalog</h2>
+                <span className="text-xs font-semibold text-slate-500 bg-slate-100 dark:bg-white/5 px-3 py-1 rounded-full">
+                  {filteredProducts.length} Items
+                </span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl bg-white dark:bg-[#14161a] border border-slate-200 dark:border-white/10 shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-white/10">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                {editId ? 'Edit Product' : 'Add New Product'}
-              </h2>
-              <button onClick={() => setShowForm(false)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 text-slate-500 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="flex px-6 pt-4 border-b border-slate-200 dark:border-white/10 gap-6">
-              {['basic', 'specs', 'advanced'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`pb-3 text-sm font-semibold capitalize border-b-2 transition-colors ${activeTab === tab ? 'border-brand-lime text-brand-lime' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0"
+                  placeholder="Search by name or ingredient..."
+                />
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full sm:w-52 rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:border-brand-lime dark:bg-[#1a1d24] dark:border-white/10 dark:text-white dark:focus:border-brand-lime placeholder-slate-400 dark:placeholder-slate-500 transition-colors min-w-0"
                 >
-                  {tab} Details
-                </button>
-              ))}
+                  <option value="All">All categories</option>
+                  {CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-              {activeTab === 'basic' && (
-                <div className="space-y-5">
-                  <div>
-                    <label className="text-xs uppercase text-slate-500 font-semibold">Product Image</label>
-                    <div className="mt-2 flex items-center gap-4">
-                      <label className="flex-1 flex flex-col items-center justify-center h-40 rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0d0f13] cursor-pointer hover:border-brand-lime transition-colors">
-                        {imagePreview ? <img src={imagePreview} className="w-full h-full object-contain p-2" /> : <div className="text-slate-400 text-center"><Upload className="w-8 h-8 mx-auto mb-2"/><span className="text-sm">Upload Image</span></div>}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                      </label>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input-field" placeholder="Name *" />
-                    <input value={form.hindiName} onChange={e => setForm({...form, hindiName: e.target.value})} className="input-field" placeholder="Hindi Name" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input value={form.technicalName} onChange={e => setForm({...form, technicalName: e.target.value})} className="input-field" placeholder="Technical Name" />
-                    <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="input-field text-black dark:text-white">
-                      {CATEGORIES.map(c => <option key={c} value={c} className="text-black">{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input value={form.badge} onChange={e => setForm({...form, badge: e.target.value})} className="input-field" placeholder="Badge (e.g., SYSTEMIC)" />
-                    <input value={form.activeIngredient} onChange={e => setForm({...form, activeIngredient: e.target.value})} className="input-field" placeholder="Active Ingredient Summary" />
-                  </div>
-                  <textarea required rows="4" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="input-field" placeholder="Description *" />
+            {loading ? (
+              <div className="flex items-center justify-center py-20 flex-1">
+                <Loader2 className="w-8 h-8 text-brand-lime animate-spin" />
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-20 flex-1 flex flex-col items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-white/5 flex items-center justify-center mb-4">
+                  <Package2 className="w-8 h-8 text-slate-300 dark:text-slate-600" />
                 </div>
-              )}
-
-              {activeTab === 'specs' && (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input value={form.formulation} onChange={e => setForm({...form, formulation: e.target.value})} className="input-field" placeholder="Formulation (e.g. WP, EC)" />
-                    <input value={form.packSize} onChange={e => setForm({...form, packSize: e.target.value})} className="input-field" placeholder="Pack Size (e.g. 500ml)" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input value={form.dosage} onChange={e => setForm({...form, dosage: e.target.value})} className="input-field" placeholder="Dosage" />
-                    <input value={form.solubility} onChange={e => setForm({...form, solubility: e.target.value})} className="input-field" placeholder="Solubility" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input value={form.cropType} onChange={e => setForm({...form, cropType: e.target.value})} className="input-field" placeholder="Crop Type" />
-                    <input value={form.targetPests} onChange={e => setForm({...form, targetPests: e.target.value})} className="input-field" placeholder="Target Pests (comma separated)" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input value={form.modeOfAction} onChange={e => setForm({...form, modeOfAction: e.target.value})} className="input-field" placeholder="Mode of Action" />
-                    <input value={form.toxicityLevel} onChange={e => setForm({...form, toxicityLevel: e.target.value})} className="input-field" placeholder="Toxicity Level" />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input value={form.shelfLife} onChange={e => setForm({...form, shelfLife: e.target.value})} className="input-field" placeholder="Shelf Life" />
-                    <input value={form.manufacturer} onChange={e => setForm({...form, manufacturer: e.target.value})} className="input-field" placeholder="Manufacturer" />
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'advanced' && (
-                <div className="space-y-8">
-                  {/* Composition */}
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <label className="text-sm font-bold text-slate-900 dark:text-white">Chemical Composition</label>
-                      <button type="button" onClick={addComp} className="text-xs bg-brand-lime text-black px-3 py-1 rounded-full font-bold">+ Add Component</button>
-                    </div>
-                    {form.composition.map((comp, i) => (
-                      <div key={i} className="flex gap-2 mb-2">
-                        <input value={comp.component} onChange={e => handleCompChange(i, 'component', e.target.value)} className="input-field flex-1 py-2 text-sm" placeholder="Component Name" />
-                        <input value={comp.amount} onChange={e => handleCompChange(i, 'amount', e.target.value)} className="input-field w-32 py-2 text-sm" placeholder="Amount (e.g. 5%)" />
-                        <button type="button" onClick={() => removeComp(i)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    ))}
-                    {form.composition.length === 0 && <p className="text-xs text-slate-500">No composition details added.</p>}
-                  </div>
-
-                  {/* Application Method */}
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <label className="text-sm font-bold text-slate-900 dark:text-white">Application Steps</label>
-                      <button type="button" onClick={addApp} className="text-xs bg-brand-lime text-black px-3 py-1 rounded-full font-bold">+ Add Step</button>
-                    </div>
-                    {form.applicationMethod.map((app, i) => (
-                      <div key={i} className="flex gap-2 mb-2 items-start">
-                        <span className="p-2 text-slate-500 font-bold">{app.step}.</span>
-                        <div className="flex-1 space-y-2">
-                          <input value={app.title} onChange={e => handleAppChange(i, 'title', e.target.value)} className="input-field py-2 text-sm" placeholder="Step Title" />
-                          <textarea value={app.instruction} onChange={e => handleAppChange(i, 'instruction', e.target.value)} className="input-field py-2 text-sm" rows="2" placeholder="Step Instructions" />
-                        </div>
-                        <button type="button" onClick={() => removeApp(i)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl mt-1"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    ))}
-                    {form.applicationMethod.length === 0 && <p className="text-xs text-slate-500">No application steps added.</p>}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
-                <button type="button" onClick={() => setShowForm(false)} className="px-6 py-3 rounded-xl border border-slate-200 dark:border-white/10 font-medium hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">Cancel</button>
-                <button type="submit" disabled={saving} className="px-6 py-3 rounded-xl bg-brand-lime text-brand-dark font-bold flex items-center gap-2 hover:bg-brand-volt disabled:opacity-60">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  {editId ? 'Update Product' : 'Add Product'}
+                <p className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">No products found</p>
+                <p className="text-sm text-slate-500 mb-4">Try adjusting your search or filters.</p>
+                <button onClick={() => { setSearchQuery(''); setCategoryFilter('All') }} className="px-5 py-2.5 rounded-xl bg-brand-lime text-brand-dark font-bold hover:bg-brand-volt transition-colors text-sm">
+                  Clear filters
                 </button>
               </div>
-            </form>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+                      <th className="py-3 px-5 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Product</th>
+                      <th className="py-3 px-5 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Category</th>
+                      <th className="py-3 px-5 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400">Status</th>
+                      <th className="py-3 px-5 text-[11px] uppercase tracking-wider font-bold text-slate-500 dark:text-slate-400 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProducts.map((product) => (
+                      <tr key={product._id} className="border-b border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors group">
+                        <td className="py-3 px-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg border border-slate-200 dark:border-white/10 bg-white dark:bg-[#0d0f13] overflow-hidden shrink-0 flex items-center justify-center">
+                              {product.image ? (
+                                <img src={product.image} alt={product.name} className="w-full h-full object-contain p-1 drop-shadow-sm" />
+                              ) : (
+                                <ImageIcon className="w-4 h-4 text-slate-300" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white">{product.name}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{product.packSize || '1L Bottle'}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-5">
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{product.category}</p>
+                        </td>
+                        <td className="py-3 px-5">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wide border border-emerald-200 dark:border-emerald-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+                          </span>
+                        </td>
+                        <td className="py-3 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => openEditForm(product)} className="p-2 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDelete(product._id)} disabled={deleting === product._id} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                              {deleting === product._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            
+            {/* Quick Stats */}
+            <div className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-4">Quick Stats</h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-brand-lime/20 flex items-center justify-center shrink-0">
+                    <Package2 className="w-5 h-5 text-brand-lime" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Total Products</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white leading-none">{products.length}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <Activity className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-0.5">Active Categories</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white leading-none">
+                      {new Set(products.map(p => p.category)).size}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Distribution */}
+            <div className="bg-white dark:bg-[#14161a] rounded-2xl border border-slate-200 dark:border-white/10 p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-5">Product Distribution</h3>
+              
+              {distribution.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">No data available</p>
+              ) : (
+                <div className="space-y-5">
+                  {distribution.map((item) => (
+                    <div key={item.category}>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${item.color.replace('bg-', 'text-').replace('500', '600')} dark:${item.color.replace('bg-', 'text-').replace('500', '400')} ${item.color.replace('bg-', 'bg-').replace('500', '500/10')}`}>
+                          {item.category}
+                        </span>
+                        <span className={`text-xs font-bold ${item.color.replace('bg-', 'text-').replace('500', '600')} dark:${item.color.replace('bg-', 'text-').replace('500', '400')}`}>
+                          {item.percentage}%
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${item.color} rounded-full`} 
+                          style={{ width: `${item.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Global styles for inputs injected safely */}
-      <style>{`
-        .input-field {
-          width: 100%;
-          border-radius: 0.75rem;
-          background-color: rgb(248 250 252);
-          border: 1px solid rgb(226 232 240);
-          padding: 0.75rem 1rem;
-          color: rgb(15 23 42);
-          transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-          transition-duration: 150ms;
-        }
-        .dark .input-field {
-          background-color: #0d0f13;
-          border-color: rgba(255, 255, 255, 0.1);
-          color: white;
-        }
-        .input-field:focus {
-          outline: none;
-          border-color: #84cc16;
-        }
-        .input-field::placeholder {
-          color: rgb(148 163 184);
-        }
-        .dark .input-field::placeholder {
-          color: rgba(255, 255, 255, 0.3);
-        }
-      `}</style>
+      
     </main>
   )
 }
