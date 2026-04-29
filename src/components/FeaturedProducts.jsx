@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ArrowRight, Heart, Loader2, Package2, Share2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
+import { motion } from 'framer-motion'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const FEATURED_COUNT = 3
@@ -105,9 +106,15 @@ const FeaturedProducts = () => {
   if (!loading && products.length === 0) return null
 
   return (
-    <section className="py-24 px-6 lg:px-8" id="products">
+    <section className="py-24 px-6 lg:px-8 overflow-hidden" id="products">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6 }}
+          className="mb-12 flex flex-col md:flex-row md:items-end md:justify-between gap-6"
+        >
           <div>
             <p className="text-sm font-bold tracking-[0.2em] text-brand-lime uppercase mb-2">Latest Additions</p>
             <h2 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 dark:text-white">
@@ -122,7 +129,7 @@ const FeaturedProducts = () => {
             View All
             <ArrowRight className="w-4 h-4" />
           </Link>
-        </div>
+        </motion.div>
 
         {loading ? (
           <div className="flex items-center justify-center py-14">
@@ -130,11 +137,15 @@ const FeaturedProducts = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-7 items-stretch">
-            {products.map((product) => {
+            {products.map((product, index) => {
               const imageSrc = typeof product.image === 'string' ? product.image.trim() : ''
 
               return (
-                <article
+                <motion.article
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: index * 0.15 }}
                   key={product._id}
                   className="rounded-2xl border border-[#c7d9c7] bg-[#edf4ed] p-2 shadow-[0_8px_18px_rgba(23,34,23,0.16)]"
                 >
@@ -224,7 +235,7 @@ const FeaturedProducts = () => {
                       <span className="w-1.5 h-1.5 rounded-full bg-[#b5d4b5]" />
                     </div>
                   </div>
-                </article>
+                </motion.article>
               )
             })}
           </div>

@@ -145,13 +145,13 @@ const ContactPage = () => {
                 <div>
                   <label className="text-xs uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400 font-semibold">Product Interest</label>
                   <select className="mt-2 w-full rounded-xl bg-slate-50 dark:bg-[#0d0f13] border border-slate-200 dark:border-white/10 px-4 py-3 text-slate-700 dark:text-gray-200 focus:outline-none focus:border-brand-lime">
-                    <option className="text-black">Select a category</option>
-                    <option className="text-black">Herbicide</option>
-                    <option className="text-black">Fungicide</option>
-                    <option className="text-black">Insecticide</option>
-                    <option className="text-black">PGR</option>
-                    <option className="text-black">Bio Products</option>
-                    <option className="text-black">Fertilizers</option>
+                    <option className="dark:bg-[#0d0f13] dark:text-gray-200">Select a category</option>
+                    <option className="dark:bg-[#0d0f13] dark:text-gray-200">Herbicide</option>
+                    <option className="dark:bg-[#0d0f13] dark:text-gray-200">Fungicide</option>
+                    <option className="dark:bg-[#0d0f13] dark:text-gray-200">Insecticide</option>
+                    <option className="dark:bg-[#0d0f13] dark:text-gray-200">PGR</option>
+                    <option className="dark:bg-[#0d0f13] dark:text-gray-200">Bio Products</option>
+                    <option className="dark:bg-[#0d0f13] dark:text-gray-200">Fertilizers</option>
                   </select>
                 </div>
               </div>

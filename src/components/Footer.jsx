@@ -35,7 +35,7 @@ const Footer = () => {
   ]
 
   return (
-    <footer className="relative pt-32 pb-8 overflow-hidden">
+    <footer className="relative pt-32 pb-8 overflow-hidden bg-[#0f1115] text-slate-50">
       {/* Large Background Text */}
       <div className="absolute bottom-0 left-0 w-full overflow-hidden pointer-events-none">
         <span className="bg-text text-white block translate-y-1/3">TULIPCROP</span>
@@ -97,7 +97,7 @@ const Footer = () => {
                 <a
                   key={i}
                   href={social.href}
-                  className="w-10 h-10 glass rounded-full flex items-center justify-center text-gray-400 hover:text-brand-lime hover:border-brand-lime/50 transition-all duration-300"
+                  className="w-10 h-10 bg-white/5 border border-white/10 backdrop-blur-md rounded-full flex items-center justify-center text-gray-400 hover:text-brand-lime hover:border-brand-lime/50 hover:bg-white/10 transition-all duration-300"
                 >
                   <social.icon className="w-4 h-4" />
                 </a>

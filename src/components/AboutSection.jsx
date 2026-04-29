@@ -1,12 +1,18 @@
 import { ArrowRight, FlaskConical, Zap, Leaf } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 
 const AboutSection = () => {
   return (
-    <section className="py-24 px-6 lg:px-8 bg-slate-50 dark:bg-[#0d0f13] transition-colors duration-300">
+    <section className="py-24 px-6 lg:px-8 bg-transparent transition-colors duration-300 overflow-hidden">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
         {/* Left Content */}
-        <div>
+        <motion.div
+           initial={{ opacity: 0, x: -50 }}
+           whileInView={{ opacity: 1, x: 0 }}
+           viewport={{ once: true, margin: "-100px" }}
+           transition={{ duration: 0.6 }}
+        >
           <div className="flex items-center gap-3 mb-6">
             <span className="w-8 h-[2px] bg-brand-lime"></span>
             <p className="text-xs font-bold tracking-[0.2em] text-brand-lime uppercase">
@@ -64,10 +70,16 @@ const AboutSection = () => {
             Our Full Story
             <ArrowRight className="w-4 h-4" />
           </Link>
-        </div>
+        </motion.div>
 
         {/* Right Images (Staggered Grid) */}
-        <div className="grid grid-cols-2 gap-4 lg:gap-6 h-[600px]">
+        <motion.div 
+          className="grid grid-cols-2 gap-4 lg:gap-6 h-[600px]"
+          initial={{ opacity: 0, x: 50 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.6 }}
+        >
           <div className="rounded-[32px] overflow-hidden bg-slate-200 dark:bg-slate-800 h-full">
             <img 
               src="https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?q=80&w=600&auto=format&fit=crop" 
@@ -91,7 +103,7 @@ const AboutSection = () => {
               />
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   )

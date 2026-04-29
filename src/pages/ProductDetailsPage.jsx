@@ -139,7 +139,7 @@ const ProductDetailsPage = () => {
   const imageSrc = typeof product.image === 'string' ? product.image.trim() : '';
 
   return (
-    <div className="min-h-screen pt-24 pb-16 bg-slate-50 dark:bg-brand-dark transition-colors duration-300">
+    <div className="min-h-screen pt-24 pb-16 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Link */}
         <Link to="/products" className="inline-flex items-center gap-2 text-slate-500 hover:text-brand-lime transition-colors mb-8">
@@ -353,7 +353,7 @@ const ProductDetailsPage = () => {
             <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-8">Similar Products</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {similarProducts.map((p) => (
-                <ProductCard key={p._id} product={p} />
+                <ProductCard key={p._id} product={p} useProductBackground />
               ))}
             </div>
           </div>

@@ -78,9 +78,9 @@ const Hero = () => {
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8 pt-32">
         <div className="text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 glass rounded-full mb-8 animate-fade-in-up">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 backdrop-blur-md rounded-full mb-8 animate-fade-in-up">
             <span className="w-2 h-2 bg-brand-volt rounded-full animate-pulse" />
-            <span className="text-sm font-medium text-gray-300">Premium Agriculture Products</span>
+            <span className="text-sm font-medium text-white">Premium Agriculture Products</span>
           </div>
 
           {/* Headline */}
@@ -105,7 +105,7 @@ const Hero = () => {
               Explore Products
               <ArrowDown className="w-5 h-5 group-hover:translate-y-1 transition-transform" />
             </a>
-            <button className="px-6 py-3 glass text-white font-semibold text-base rounded-full hover:bg-white/10 transition-all duration-300 flex items-center gap-2">
+            <button className="px-6 py-3 bg-white/10 border border-white/20 backdrop-blur-md text-white font-semibold text-base rounded-full hover:bg-white/20 transition-all duration-300 flex items-center gap-2">
               <Play className="w-5 h-5" />
               Watch Video
             </button>
