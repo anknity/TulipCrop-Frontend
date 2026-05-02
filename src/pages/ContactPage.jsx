@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ArrowRight, Clock3, Mail, MapPin, MessageCircle, Phone, Send } from 'lucide-react'
+import SEO from '../components/SEO'
 
 const inquiryTypes = ['General', 'Product Enquiry', 'Distributorship', 'Technical Support']
 
@@ -32,6 +33,11 @@ const ContactPage = () => {
 
   return (
     <main className="min-h-screen pt-24 pb-16">
+      <SEO 
+        title="Contact Us" 
+        description="Get in touch with TulipCrop for product inquiries, technical support, and distributorship opportunities across India." 
+        url="/contact"
+      />
       <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-12">
         <section className="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-gradient-to-r from-slate-50 via-slate-100 to-slate-50 dark:from-[#14161a] dark:via-[#181b21] dark:to-[#14161a] p-8 md:p-12">
           <p className="text-xs uppercase tracking-[0.2em] text-brand-lime font-semibold mb-4">Contact</p>

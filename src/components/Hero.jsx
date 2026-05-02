@@ -56,7 +56,7 @@ const Hero = () => {
             loop
             muted
             playsInline
-            preload="auto"
+            preload="none"
             onCanPlay={() => setVideoReady(true)}
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${videoReady ? 'opacity-70' : 'opacity-0'}`}
           >

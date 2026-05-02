@@ -3,6 +3,7 @@ import { ChevronDown, Filter, Loader2, Search } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import ProductCard from '../components/ProductCard'
 import axios from 'axios'
+import SEO from '../components/SEO'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -94,6 +95,11 @@ const ProductsPage = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16">
+      <SEO 
+        title="Our Products" 
+        description="Explore TulipCrop's premium catalog of agrochemicals, including insecticides, fungicides, herbicides, and PGRs designed for superior crop protection." 
+        url="/products"
+      />
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         {/* Header Section */}
         <div className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8">

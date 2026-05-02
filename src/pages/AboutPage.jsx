@@ -9,6 +9,7 @@ import {
   Star,
   Target,
 } from 'lucide-react'
+import SEO from '../components/SEO'
 
 const strengths = [
   {
@@ -46,6 +47,11 @@ const strengths = [
 const AboutPage = () => {
   return (
     <main className="min-h-screen pt-24 pb-16">
+      <SEO 
+        title="About Us | Our Story & Vision" 
+        description="Learn about TulipCrop's journey, our commitment to eco-friendly agriculture, and the research-backed formulations that make us an industry leader." 
+        url="/about"
+      />
       <div className="max-w-7xl mx-auto px-6 lg:px-8 space-y-24">
         <section id="about-overview" className="grid lg:grid-cols-2 gap-10 items-center">
           <div>

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, Loader2, Droplet, Sprout, Download, MessageCircle, Shield, Beaker, Clock, Target, Leaf, Package } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import SEO from '../components/SEO';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -140,6 +141,12 @@ const ProductDetailsPage = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-16 transition-colors duration-300">
+      <SEO 
+        title={product.name} 
+        description={product.description ? product.description.slice(0, 160) : 'Premium agricultural product'} 
+        url={`/products/${product._id}`} 
+        image={imageSrc || '/logo.png'} 
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Link */}
         <Link to="/products" className="inline-flex items-center gap-2 text-slate-500 hover:text-brand-lime transition-colors mb-8">

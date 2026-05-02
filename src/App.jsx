@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 import HomePage from './pages/HomePage'
 import ProductsPage from './pages/ProductsPage'
 import ProductDetailsPage from './pages/ProductDetailsPage'
@@ -38,23 +39,25 @@ function App() {
   }
 
   return (
-    <Router>
-      <ScrollToTop />
-      <div className="min-h-screen text-slate-900 dark:text-slate-50 transition-colors duration-300">
-        <Navbar theme={theme} toggleTheme={toggleTheme} />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/:id" element={<ProductDetailsPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/panel" element={<AdminPanel />} />
-        </Routes>
-        <Footer />
-        <ChatBot />
-      </div>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <ScrollToTop />
+        <div className="min-h-screen text-slate-900 dark:text-slate-50 transition-colors duration-300">
+          <Navbar theme={theme} toggleTheme={toggleTheme} />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/products/:id" element={<ProductDetailsPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/panel" element={<AdminPanel />} />
+          </Routes>
+          <Footer />
+          <ChatBot />
+        </div>
+      </Router>
+    </HelmetProvider>
   )
 }
 
